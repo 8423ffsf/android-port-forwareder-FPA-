@@ -1,0 +1,12 @@
+<resources>
+    <string name="app_name">Android Port Forwarder</string>
+    <string name="rule_name">规则名称</string>
+    <string name="local_port">本地端口</string>
+    <string name="target">目标地址</string>
+    <string name="target_address">目标地址</string>
+    <string name="target_port">目标端口</string>
+    <string name="protocol_udp">UDP协议</string>
+    <string name="enable_rule">启用规则</string>
+    <string name="save_rule">保存规则</string>
+    <string name="status">状态</string>
+</resources>

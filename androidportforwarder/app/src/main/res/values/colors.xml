@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 基础颜色 -->
+    <color name="white">#FFFFFFFF</color>
+    <color name="black">#FF000000</color>
+
+    <!-- Material Purple 系列 -->
+    <color name="purple_200">#FFBB86FC</color>
+    <color name="purple_500">#FF6200EE</color>
+    <color name="purple_700">#FF3700B3</color>
+
+    <!-- Material Teal 系列 -->
+    <color name="teal_200">#FF03DAC5</color>
+    <color name="teal_700">#FF018786</color>
+
+    <!-- 主色变体 -->
+    <color name="colorPrimaryVariant">@color/purple_700</color>
+    <!-- 深色模式文本（res/values-night/colors.xml） -->
+    <color name="primary_text">#FFFFFFFF</color>   <!-- 白色 -->
+    <color name="secondary_text">#B3FFFFFF</color> <!-- 70% 不透明度白 -->
+    <color name="hint_text">#80FFFFFF</color>      <!-- 50% 不透明度白 -->
+</resources>

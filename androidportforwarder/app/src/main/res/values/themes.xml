@@ -1,0 +1,17 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Base application theme. -->
+    <style name="Theme.AndroidPortForwarder" parent="Theme.Material3.DayNight">
+    <!-- 文本颜色系统 -->
+        <item name="android:textColorPrimary">@color/primary_text</item>
+        <item name="android:textColorSecondary">@color/secondary_text</item>
+        <item name="android:textColorTertiary">@color/hint_text</item>
+    
+    <!-- 适配 Material3 属性 -->
+        <item name="textAppearanceBodyLarge">@style/TextAppearance.BodyLarge</item>
+    </style>
+
+<!-- 文本样式定义 -->
+    <style name="TextAppearance.BodyLarge" parent="TextAppearance.Material3.BodyLarge">
+        <item name="android:textColor">?android:attr/textColorPrimary</item>
+    </style>
+</resources>

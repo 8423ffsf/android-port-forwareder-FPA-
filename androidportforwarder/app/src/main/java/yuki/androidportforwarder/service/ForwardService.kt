@@ -8,6 +8,7 @@ import android.app.Service
 import android.content.Intent
 import android.os.Build
 import android.os.IBinder
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import kotlinx.coroutines.*
 import java.net.InetAddress
@@ -19,6 +20,7 @@ import java.nio.channels.SocketChannel
 import yuki.androidportforwarder.R
 import yuki.androidportforwarder.data.model.ForwardRule
 import yuki.androidportforwarder.data.repository.RuleRepository
+import java.io.IOException
 
 class PortForwardService : Service() {
     private val serviceJob = SupervisorJob()
@@ -51,77 +53,102 @@ class PortForwardService : Service() {
     }
 
     private suspend fun handleTcpForwarding(rule: ForwardRule) {
-        val serverSocket = ServerSocketChannel.open().apply {
-            bind(InetSocketAddress(rule.localPort))
-            configureBlocking(true)
-        }
-
         try {
-            while (true) {
-                val clientSocket = serverSocket.accept()
-                serviceScope.launch(Dispatchers.IO) {
-                    var targetSocket: SocketChannel? = null
-                    try {
-                        targetSocket = SocketChannel.open(
-                            InetSocketAddress(
-                                InetAddress.getByName(rule.targetAddress),
-                                rule.targetPort
-                            )
-                        )
-                        forwardTcpData(clientSocket, targetSocket)
-                    } catch (e: Exception) {
-                        // 处理连接异常
-                    } finally {
-                        clientSocket.close()
-                        targetSocket?.close()
+            val serverSocket = ServerSocketChannel.open().apply {
+                bind(InetSocketAddress("0.0.0.0", rule.localPort))
+                configureBlocking(true)
+            }
+
+            try {
+                while (true) {
+                    val clientSocket = serverSocket.accept().apply {
+                        configureBlocking(false)
+                    }
+
+                    serviceScope.launch(Dispatchers.IO) {
+                        var targetSocket: SocketChannel? = null
+                        try {
+                            targetSocket = SocketChannel.open().apply {
+                                connect(InetSocketAddress(
+                                    InetAddress.getByName(rule.targetAddress),
+                                    rule.targetPort
+                                ))
+                                configureBlocking(false)
+                                while (!finishConnect()) {
+                                    delay(50)
+                                }
+                            }
+
+                            // 双向数据管道
+                            listOf(
+                                launch { forwardTcpData(clientSocket, targetSocket!!, "Inbound") },
+                                launch { forwardTcpData(targetSocket!!, clientSocket, "Outbound") }
+                            ).forEach { it.join() }
+
+                        } catch (e: Exception) {
+                            Log.e("TCP", "Forwarding error: ${e.stackTraceToString()}")
+                        } finally {
+                            clientSocket.close()
+                            targetSocket?.close()
+                        }
                     }
                 }
+            } finally {
+                serverSocket.close()
             }
-        } finally {
-            serverSocket.close()
+        } catch (e: IOException) {
+            Log.e("TCP", "Port binding failed: ${e.message}")
         }
     }
 
     private suspend fun handleUdpForwarding(rule: ForwardRule) {
-        val channel = DatagramChannel.open().apply {
-            bind(InetSocketAddress(rule.localPort))
-            configureBlocking(true)
-        }
-        val buffer = ByteBuffer.allocate(4096)
-
         try {
-            while (true) {
-                buffer.clear()
-                val clientAddress = channel.receive(buffer) as? InetSocketAddress
-                clientAddress?.let {
-                    buffer.flip()
-                    channel.send(buffer, InetSocketAddress(
-                        InetAddress.getByName(rule.targetAddress),
-                        rule.targetPort
-                    ))
-                }
+            val channel = DatagramChannel.open().apply {
+                bind(InetSocketAddress("0.0.0.0", rule.localPort)) // 明确绑定到所有接口
+                configureBlocking(true)
             }
-        } finally {
-            channel.close()
+            val buffer = ByteBuffer.allocate(4096)
+
+            try {
+                while (true) {  // 使用协程状态检查
+                    buffer.clear()
+                    val senderAddress = channel.receive(buffer) as? InetSocketAddress
+                    senderAddress?.let {
+                        buffer.flip()
+                        channel.send(buffer, InetSocketAddress(
+                            InetAddress.getByName(rule.targetAddress),
+                            rule.targetPort
+                        ))
+                    }
+                }
+            } finally {
+                channel.close()
+            }
+        } catch (e: IOException) {
+            Log.e("UDP", "Failed to bind port ${rule.localPort}: ${e.message}")
         }
     }
 
-    private fun forwardTcpData(source: SocketChannel, dest: SocketChannel) {
-        val buffer = ByteBuffer.allocate(4096)
+    private fun forwardTcpData(
+        source: SocketChannel,
+        dest: SocketChannel,
+        direction: String
+    ) {
+        val buffer = ByteBuffer.allocate(8192)
         try {
             while (source.isOpen && dest.isOpen) {
                 buffer.clear()
-                val bytesRead = source.read(buffer)
-                if (bytesRead == -1) break
+                val read = source.read(buffer)
+                if (read == -1) break
 
                 buffer.flip()
                 while (buffer.hasRemaining()) {
                     dest.write(buffer)
                 }
+                Log.d("Forward", "$direction: ${buffer.position()} bytes")
             }
-        } finally {
-            source.close()
-            dest.close()
+        } catch (e: Exception) {
+            Log.e("Forward", "$direction error: ${e.message}")
         }
     }
 
